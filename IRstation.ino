@@ -7,64 +7,37 @@
 const char* ssid     = ""; //Your Networkd SSID
 const char* password = ""; //Your Networkd Password
 
-//https://sourceforge.net/p/lirc-remotes/code/ci/master/tree/remotes/lg/6710T00009B.lircd.conf
-const unsigned long LG_POWER = 0x20DF10EF;
-const unsigned long LG_VOLUMEUP = 0x20DF40BF;
-const unsigned long LG_VOLUMEDOWN = 0x20DFC03F;
-const unsigned long LG_MUTE = 0x20DF906F; //TODO need to test
-const unsigned long LG_CHANNELUP = 0x20DF00FF; //TODO need to test
-const unsigned long LG_CHANNELDOWN = 0x20DF807F; //TODO need to test
-const unsigned long LG_SOURCE = 0x20DF19E6; //TODO need to test
-
+const int ACTION_LED = 2;
+const int POWER_LED = 13;
+const int ON = 1;
+const int OFF = 0;
 
 ESP8266WebServer server(80);
 IRsend irsend(4); //an IR emitter led is connected to GPIO pin 4
 
-const int ACTION_LED = 2;
-const int POWER_LED = 13;
-
 void handleRoot() {
-  digitalWrite(ACTION_LED, 1);
-  server.send(200, "text/plain", "hello from esp8266!");
-  digitalWrite(ACTION_LED, 0);
+  digitalWrite(ACTION_LED, ON);
+  server.send(200, "text/plain", "hello from IRstation!");
+  digitalWrite(ACTION_LED, OFF);
 }
 
 void handleRemote() {
   digitalWrite(ACTION_LED, 1);
-  //FIXME there will only be one power code
-  String power = server.arg("power");
-  String volume = server.arg("volume");
-  String channel = server.arg("channel");
-  String mute = server.arg("mute");
-  String source = server.arg("source");
-  String ON = "ON"; //TODO
-  String UP = "UP";
-  String DOWN = "DOWN";
 
-  if(ON.equalsIgnoreCase(power)) {
-    server.send(200, "text/plain", "turning TV on");
-    irsend.sendNEC(LG_POWER, 32);
-  } else if (ON.equalsIgnoreCase(mute)) {
-    server.send(200, "text/plain", "mute");
-    irsend.sendNEC(LG_MUTE, 32);
-  } else if (ON.equalsIgnoreCase(source)) {
-    server.send(200, "text/plain", "source");
-    irsend.sendNEC(LG_SOURCE, 32);
-  }else if (UP.equalsIgnoreCase(volume)) {
-    server.send(200, "text/plain", "volume up");
-    irsend.sendNEC(LG_VOLUMEUP, 32);
-  } else if (DOWN.equalsIgnoreCase(volume)) {
-    server.send(200, "text/plain", "volume down");
-    irsend.sendNEC(LG_VOLUMEDOWN, 32);
-  } else if (UP.equalsIgnoreCase(channel)) {
-    server.send(200, "text/plain", "channel up");
-    irsend.sendNEC(LG_CHANNELUP, 32);
-  } else if (DOWN.equalsIgnoreCase(channel)) {
-    server.send(200, "text/plain", "channel down");
-    irsend.sendNEC(LG_CHANNELDOWN, 32);
+  String codeStr = server.arg("code");
+  char * temp;
+  Serial.print("codeStr: " + codeStr + "\n");
+
+  long codeLong = strtol(codeStr.c_str(), &temp, 0);
+
+  if (*temp == '\0') {
+    //TODO need to support wouth bit length and send types.
+    irsend.sendNEC(codeLong, 32);
+    server.send(204, "text/plain", "");
   } else {
-    server.send(200, "text/plain", "unknown command");
+    server.send(400, "text/plain", "remote code parameter is not a valid number");
   }
+  
   digitalWrite(ACTION_LED, 0);
 }
 
@@ -88,12 +61,12 @@ void handleNotFound(){
 void setup(void){
   pinMode(POWER_LED, OUTPUT);
   pinMode(ACTION_LED, OUTPUT);
-  digitalWrite(ACTION_LED, 0);
-  digitalWrite(POWER_LED, 0);
+  digitalWrite(ACTION_LED, OFF);
+  digitalWrite(POWER_LED, OFF);
 
   irsend.begin();
   Serial.begin(115200);
-  digitalWrite(POWER_LED, 1);
+  digitalWrite(POWER_LED, OFF);
   delay(100);
 
   Serial.println("");
@@ -103,13 +76,13 @@ void setup(void){
 
   // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
-    digitalWrite(ACTION_LED, 1);
+    digitalWrite(ACTION_LED, ON);
     delay(500);
-    digitalWrite(ACTION_LED, 0);
     Serial.print(".");
   }
-  digitalWrite(POWER_LED, 1);
-  
+  digitalWrite(ACTION_LED, OFF);
+  digitalWrite(POWER_LED, ON);
+
   Serial.println("");
   Serial.print("Connected to ");
   Serial.println(ssid);
@@ -122,20 +95,13 @@ void setup(void){
 
   server.on("/", handleRoot);
   server.on("/remote", handleRemote);
-
-  server.on("/inline", [](){
-    server.send(200, "text/plain", "this works as well");
-  });
-
   server.onNotFound(handleNotFound);
-
   server.begin();
   Serial.println("HTTP server started");
-
 
 }
 
 void loop(void){
   server.handleClient();
-      delay(1000);
+      delay(250);
 }
