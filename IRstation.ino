@@ -26,7 +26,6 @@ void handleRemote() {
 
   String codeStr = server.arg("code");
   char * temp;
-  Serial.print("codeStr: " + codeStr + "\n");
 
   long codeLong = strtol(codeStr.c_str(), &temp, 0);
 
